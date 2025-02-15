@@ -94,9 +94,9 @@ class ThreadManager {
 
   uint64_t DoTCPConnect(T &t, int fd, const std::shared_ptr<Connection> &conn);
 
-  uint32_t get_client_count() const { return clientCount_.load(); }
+  uint32_t get_client_count() const { return client_count_.load(); }
 
-  void client_count_decrement() { clientCount_.fetch_sub(1, std::memory_order_relaxed); }
+  void client_count_decrement() { client_count_.fetch_sub(1, std::memory_order_seq_cst); }
 
  private:
   const int8_t index_ = 0;            // The index of the thread
@@ -105,7 +105,7 @@ class ThreadManager {
 
   NetOptions net_options_;
 
-  inline static std::atomic<uint32_t> clientCount_{0};
+  inline static std::atomic<uint32_t> client_count_{0};
 
   std::unique_ptr<IOThread> read_thread_;   // Read thread
   std::unique_ptr<IOThread> write_thread_;  // Write thread
@@ -160,6 +160,22 @@ void ThreadManager<T>::Stop() {
 template <typename T>
 requires HasSetFdFunction<T>
 void ThreadManager<T>::OnNetEventCreate(int fd, const std::shared_ptr<Connection> &conn) {
+  uint32_t expected = get_client_count();
+  if (!client_count_.compare_exchange_strong(expected, expected + 1, std::memory_order_seq_cst,
+                                            std::memory_order_seq_cst) ||
+      expected >= net_options_.GetMaxClients()) {
+    INFO("Max client connections, refuse new connection fd:{}", fd);
+    std::string response = "-ERR max clients reached\r\n";
+    ssize_t sent = ::send(fd, response.c_str(), response.size(), 0);
+    if (sent < 0) {
+      ERROR("Failed to send error response to fd: %d, errno: %d", fd, errno);
+    }
+    if (::close(fd) < 0) {
+      ERROR("Failed to close fd: %d, errno: %d", fd, errno);
+    }
+    return;
+  }
+
   T t;
   on_init_(&t);
   auto conn_id = getConnId();
