@@ -8,6 +8,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -17,6 +18,8 @@
 #include "config.h"
 #include "io_thread.h"
 #include "net_options.h"
+
+#include "log.h"
 
 #if defined(HAVE_EPOLL)
 
@@ -91,6 +94,10 @@ class ThreadManager {
 
   uint64_t DoTCPConnect(T &t, int fd, const std::shared_ptr<Connection> &conn);
 
+  uint32_t get_client_count() const { return clientCount_.load(); }
+
+  void client_count_decrement() { clientCount_.fetch_sub(1, std::memory_order_relaxed); }
+
  private:
   const int8_t index_ = 0;            // The index of the thread
   uint32_t tcp_keep_alive_ = 300;     // The timeout of the keepalive connection in seconds
@@ -98,11 +105,13 @@ class ThreadManager {
 
   NetOptions net_options_;
 
+  inline static std::atomic<uint32_t> clientCount_{0};
+
   std::unique_ptr<IOThread> read_thread_;   // Read thread
   std::unique_ptr<IOThread> write_thread_;  // Write thread
 
-  // All connections for the current thread
-  std::unordered_map<uint64_t, std::pair<T, std::shared_ptr<Connection>>> connections_;
+  std::unordered_map<uint64_t, std::pair<T, std::shared_ptr<Connection>>>
+      connections_;  // All connections for the current thread
 
   std::shared_mutex mutex_;
 
@@ -208,6 +217,7 @@ void ThreadManager<T>::OnNetEventClose(uint64_t conn_id, std::string &&err) {
   iter->second.second->net_event_->Close();  // close socket
   on_close_(iter->second.first, std::move(err));
   connections_.erase(iter);
+  client_count_decrement();
 }
 
 template <typename T>
