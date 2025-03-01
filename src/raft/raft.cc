@@ -10,7 +10,6 @@
 #include <cassert>
 
 #include "braft/raft.h"
-#include "braft/snapshot.h"
 #include "braft/util.h"
 #include "brpc/server.h"
 #include "gflags/gflags.h"
@@ -219,7 +218,7 @@ std::string Raft::GetLeaderAddress() const {
   auto id = node_->leader_id();
   // The cluster does not have a leader.
   if (id.is_empty()) {
-    return std::string();
+    return "";
   }
 
   id.addr.port -= g_config.raft_port_offset;
@@ -322,7 +321,7 @@ void Raft::SendNodeRequest(PClient* client) {
 void Raft::SendNodeInfoRequest(PClient* client, const std::string& info_type) {
   assert(client);
 
-  client->AppendArrayLen(int64_t(2));
+  client->AppendArrayLen(2);
   client->AppendString("INFO");
   client->AppendString(info_type);
   client->SendPacket();
@@ -337,7 +336,7 @@ void Raft::SendNodeAddRequest(PClient* client) {
   auto port = g_config.port + kiwi::g_config.raft_port_offset;
   auto raw_addr = g_config.raft_ip + ":" + std::to_string(port);
 
-  client->AppendArrayLen(int64_t(4));
+  client->AppendArrayLen((4));
   client->AppendString("RAFT.NODE");
   client->AppendString("ADD");
   client->AppendString(std::to_string(unused_node_id));
@@ -348,7 +347,7 @@ void Raft::SendNodeAddRequest(PClient* client) {
 
 void Raft::SendNodeRemoveRequest(PClient* client) {
   assert(client);
-  client->AppendArrayLen(int64_t(3));
+  client->AppendArrayLen(3);
   client->AppendString("RAFT.NODE");
   client->AppendString("REMOVE");
   client->AppendString(cluster_cmd_ctx_.GetPeerID());

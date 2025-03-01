@@ -292,12 +292,13 @@ void ThreadManager<T>::SendPacket(const T &conn, std::string &&msg) {
     conn_ptr = iter->second.second;
   }
 
-  conn_ptr->net_event_->SendPacket(std::move(msg));
-  if (net_options_.GetRwSeparation()) {
-    write_thread_->SetWriteEvent(conn_id, conn_ptr->fd_);
-  } else {
-    read_thread_->SetWriteEvent(conn_id, conn_ptr->fd_);
-  }
+  conn_ptr->net_event_->SendPacket(std::move(msg), [&]() {
+    if (net_options_.GetRwSeparation()) {
+      write_thread_->SetWriteEvent(conn_id, conn_ptr->fd_);
+    } else {
+      read_thread_->SetWriteEvent(conn_id, conn_ptr->fd_);
+    }
+  });
 }
 
 template <typename T>
@@ -383,6 +384,9 @@ uint64_t ThreadManager<T>::DoTCPConnect(T &t, int fd, const std::shared_ptr<Conn
   }
 
   read_thread_->AddNewEvent(conn_id, fd, BaseEvent::EVENT_READ);
+  if (write_thread_) {
+    write_thread_->AddNewEvent(conn_id, fd, BaseEvent::EVENT_NULL);  // add null event to write_thread epoll
+  }
   return conn_id;
 }
 

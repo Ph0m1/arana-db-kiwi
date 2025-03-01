@@ -61,7 +61,7 @@ inline void SaveCommand(const std::vector<PString>& params, DEST& dst) {
 }
 
 // master side
-enum PSlaveState {
+enum PSlaveState : int8_t {
   kPSlaveStateNone,
   kPSlaveStateWaitBgsaveStart,  // 有非sync的bgsave进行 要等待
   kPSlaveStateWaitBgsaveEnd,    // sync bgsave正在进行
@@ -77,7 +77,7 @@ struct PSlaveInfo {
 };
 
 // slave side
-enum PReplState {
+enum PReplState : int8_t {
   kPReplStateNone,
   kPReplStateConnecting,
   kPReplStateConnected,

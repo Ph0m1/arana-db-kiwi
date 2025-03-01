@@ -159,6 +159,9 @@ void PReplication::SendToSlaves(const std::vector<PString>& params) {
 void PReplication::Cron() {
   static unsigned pingCron = 0;
 
+  // Every 50 calls to Cron, this method will traverse the slaves_ list,
+  // sending PING requests to the online slave nodes to confirm their status.
+  // If the reference to a slave node has become invalid, it will be removed from the list.
   if (pingCron++ % 50 == 0) {
     for (auto it = slaves_.begin(); it != slaves_.end();) {
       auto cli = it->lock();

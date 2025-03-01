@@ -8,7 +8,6 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
 
 #include "callback_function.h"
 
@@ -29,6 +28,8 @@ enum class NetListen {
   LISTEN_ERROR,
 };
 
+class BaseEvent;
+
 // abstraction of all networks
 class NetEvent {
  public:
@@ -43,12 +44,12 @@ class NetEvent {
   virtual int OnReadable(const std::shared_ptr<Connection> &conn, std::string *readBuff) = 0;
 
   // Handle write event when the connection is writable and the data can be sent
-  virtual int OnWritable() = 0;
+  virtual int OnWritable(uint64_t id, int fd, BaseEvent *event) = 0;
 
   virtual void OnError() = 0;
 
   // Send data
-  virtual bool SendPacket(std::string &&msg) = 0;
+  virtual void SendPacket(std::string &&msg, std::function<void()> addWriteFlag) = 0;
 
   virtual void Close() = 0;
 

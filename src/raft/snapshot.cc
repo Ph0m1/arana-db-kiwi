@@ -19,7 +19,6 @@
 #include "std/log.h"
 #include "std/std_string.h"
 
-#include "config.h"
 #include "raft.h"
 #include "store.h"
 

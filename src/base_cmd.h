@@ -144,6 +144,8 @@ const std::string kCmdNameRPush = "rpush";
 const std::string kCmdNameRPushx = "rpushx";
 const std::string kCmdNameLPop = "lpop";
 const std::string kCmdNameRPop = "rpop";
+const std::string kCmdNameBLPop = "blpop";
+const std::string kCmdNameBRPop = "brpop";
 const std::string kCmdNameLRem = "lrem";
 const std::string kCmdNameLRange = "lrange";
 const std::string kCmdNameLTrim = "ltrim";
@@ -219,6 +221,22 @@ enum AclCategory {
   kAclCategoryRaft = (1 << 21),
 };
 
+class BlockedConnNode {
+ public:
+  enum Type { NotAny = 0, BLPop, BRPop };
+  virtual ~BlockedConnNode() = default;
+  BlockedConnNode(int64_t expire_time, std::shared_ptr<PClient> client, Type type)
+      : expire_time_(expire_time), client_(client), type_(type) {}
+  bool IsExpired(std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
+  std::shared_ptr<PClient> GetBlockedClient() { return client_; }
+  Type GetCmdType() { return type_; }
+
+ private:
+  Type type_ = NotAny;
+  int64_t expire_time_ = 0;
+  std::shared_ptr<PClient> client_;
+};
+
 /**
  * @brief Base class for all commands
  * BaseCmd, as the base class for all commands, mainly implements some common functions
@@ -282,6 +300,11 @@ class BaseCmd : public std::enable_shared_from_this<BaseCmd> {
 
   uint32_t GetCmdID() const;
 
+  void ServeAndUnblockConns(PClient* client);
+
+  void BlockThisClientToWaitLRPush(std::vector<std::string>& keys, int64_t expire_time, std::shared_ptr<PClient> client,
+                                   BlockedConnNode::Type type);
+
  protected:
   // Execute a specific command
   virtual void DoCmd(PClient* client) = 0;
@@ -321,4 +344,18 @@ class BaseCmdGroup : public BaseCmd {
  private:
   std::map<std::string, std::unique_ptr<BaseCmd>> subCmds_;
 };
+
+struct BlockKey {  // this data struct is made for the scenario of multi dbs in kiwi.
+  BlockKey(int db_id, const std::string& key) : db_id_(db_id), key_(key) {}
+
+  int db_id_ = -1;
+  std::string key_;
+  bool operator==(const BlockKey& p) const { return p.db_id_ == db_id_ && p.key_ == key_; }
+};
+struct BlockKeyHash {
+  std::size_t operator()(const BlockKey& k) const {
+    return std::hash<int>{}(k.db_id_) ^ std::hash<std::string>{}(k.key_);
+  }
+};
+
 }  // namespace kiwi

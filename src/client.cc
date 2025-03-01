@@ -14,12 +14,9 @@
 #include "base_cmd.h"
 #include "client.h"
 #include "config.h"
-#include "env.h"
 #include "kiwi.h"
 #include "raft/raft.h"
-#include "slow_log.h"
 #include "std/log.h"
-#include "std/std_string.h"
 
 namespace kiwi {
 
@@ -303,6 +300,7 @@ bool PClient::isPeerMaster() const {
   return repl_addr.GetIP() == PeerIP() && repl_addr.GetPort() == PeerPort();
 }
 
+// check if the client is the target of the cluster command
 bool PClient::isClusterCmdTarget() const {
   return RAFT_INST.GetClusterCmdCtx().GetPeerIp() == PeerIP() && RAFT_INST.GetClusterCmdCtx().GetPort() == PeerPort();
 }
